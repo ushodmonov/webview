@@ -1,9 +1,7 @@
-import 'dart:collection';
 import 'dart:developer';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,71 +34,77 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late InAppWebViewController controller;
+  late final WebViewController _controller;
+  String receivedMessage = "Waiting for JavaScript...";
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        "flutter_invoke",
+        onMessageReceived: (JavaScriptMessage message) {
+          log("Received message from JavaScript: ${message.message}");
+        },
+      )
+      ..loadHtmlString(_loadHtml());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      body: WebViewWidget(controller: _controller),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          String name = 'Hello from Flutter';
-          controller.evaluateJavascript(source: 'changeText(\'$name\');');
+          _controller.runJavaScript("changeText('Hello from Flutter!');");
         },
-        tooltip: 'Change',
-        child: const Icon(Icons.change_circle),
-      ),
-      body: InAppWebView(
-        initialSettings: InAppWebViewSettings(
-          isInspectable: kDebugMode,
-          mediaPlaybackRequiresUserGesture: false,
-          allowsInlineMediaPlayback: true,
-          iframeAllow: "camera; microphone",
-          iframeAllowFullscreen: true,
-          clearCache: true,
-          cacheEnabled: false,
-          clearSessionCache: true,
-          cacheMode: CacheMode.LOAD_NO_CACHE,
-        ),
-        initialUrlRequest: URLRequest(
-          url: WebUri(Uri.dataFromString(
-            '''
-      <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebView Example</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            text-align: center;
-        }
-    </style>
-    <script>
-        function changeText(newText) {
-            document.getElementById('text').innerHTML = newText;
-        }
-    </script>
-</head>
-<body>
-    <h1 id="text">Initial Text</h1>
-</body>
-</html>
-          ''',
-            mimeType: 'text/html',
-          ).toString()),
-        ),
-        initialUserScripts: UnmodifiableListView<UserScript>([]),
-        onWebViewCreated: (controller) {
-          this.controller = controller;
-        },
-        onConsoleMessage: (controller, consoleMessage) {
-          log(consoleMessage.toString());
-        },
+        child: const Icon(Icons.edit),
       ),
     );
+  }
+
+  String _loadHtml() {
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WebView Example</title>
+        <style>
+            body {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                text-align: center;
+            }
+            button {
+                margin-top: 20px;
+                padding: 10px;
+                font-size: 16px;
+            }
+        </style>
+        <script>
+            function changeText(newText) {
+                document.getElementById('text').innerHTML = newText;
+            }
+
+            function sendMessageToFlutter() {
+                window.flutter_invoke.postMessage("Hello from JavaScript!");
+            }
+        </script>
+    </head>
+    <body>
+        <h1 id="text">Initial Text</h1>
+        <button onclick="changeText('Hello from JavaScript!')">Change Text</button>
+        <button onclick="sendMessageToFlutter()">Send Message to Flutter</button>
+    </body>
+    </html>
+    ''';
   }
 }

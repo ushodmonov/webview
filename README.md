@@ -14,5 +14,5 @@ flutter pub get
 
  Webview
 ```bash
-flutter pub add flutter_inappwebview
+flutter pub add webview_flutter
 ```
